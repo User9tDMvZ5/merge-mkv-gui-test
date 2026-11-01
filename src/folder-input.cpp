@@ -1,5 +1,36 @@
-#include "folder-input.hpp"
 #include "string-utils.hpp"
+
+namespace {
+  std::string lowercaseExtension(const fs::path& path) {
+    auto extension = path.extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(),
+                   [](unsigned char character) {
+                     return static_cast<char>(std::tolower(character));
+                   });
+    return extension;
+  }
+
+  bool hasExtension(const fs::path& path, const fs::path& expected) {
+    return lowercaseExtension(path) == lowercaseExtension(expected);
+  }
+
+  bool isSupportedAudioExtension(const fs::path& path) {
+    static const std::unordered_set<std::string> extensions{
+        ".mka", ".ac3", ".eac3", ".dts", ".thd",
+        ".mp3", ".aac", ".m4a", ".mp4",
+        ".ogg", ".oga", ".opus",
+        ".flac", ".wav", ".wma",
+        ".aif", ".aiff", ".ape", ".tta", ".wv",
+    };
+    return extensions.contains(lowercaseExtension(path));
+  }
+
+  bool shouldShowFile(const fs::path& path, const fs::path& extension,
+                      bool acceptAudioExtensions) {
+    return extension.empty() || hasExtension(path, extension) ||
+           (acceptAudioExtensions && isSupportedAudioExtension(path));
+  }
+}
 
 FolderInput::FolderInput(wxWindow* parent, const wxString& title, fs::path extension,
                          FolderInputFlags flags)
@@ -33,8 +64,7 @@ std::vector<fs::path> FolderInput::getFilteredFileList() const {
   std::vector<fs::path> paths;
 
   for (const auto& path : allFiles_) {
-    if (extension_.empty() || path.extension() == extension_ ||
-        (acceptAudioExtensions_ && (path.extension() == ".mka" || path.extension() == ".ac3"))) {
+    if (shouldShowFile(path, extension_, acceptAudioExtensions_)) {
       paths.push_back(path);
     }
   }
@@ -115,8 +145,7 @@ void FolderInput::updateControl() {
   stringArr.Alloc(allFiles_.size());
 
   for (const auto& path : allFiles_) {
-    if (extension_.empty() || path.extension() == extension_ ||
-        (acceptAudioExtensions_ && (path.extension() == ".mka" || path.extension() == ".ac3"))) {
+    if (shouldShowFile(path, extension_, acceptAudioExtensions_)) {
       stringArr.Add(toWxString(path.filename()));
     }
   }
