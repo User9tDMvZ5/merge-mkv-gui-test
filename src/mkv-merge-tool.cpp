@@ -4,6 +4,13 @@
 #include <subprocess.h>
 
 namespace {
+  // Convert filesystem paths to UTF-8. subprocess.h converts UTF-8 to UTF-16
+  // and applies Windows argument quoting when creating the process.
+  std::string pathToUtf8(const fs::path& path) {
+    const auto value = path.u8string();
+    return std::string(reinterpret_cast<const char*>(value.data()), value.size());
+  }
+
   std::optional<int> runSubprocess(std::vector<std::string> arguments) {
     std::vector<const char*> cmd(arguments.size() + 1, nullptr);
     std::transform(arguments.begin(), arguments.end(), cmd.begin(),
@@ -48,16 +55,16 @@ MkvMergeResult runMkvMergeTool(const RunMkvMergeOptions& options) {
   }
 
   auto arguments = std::vector<std::string>{
-      mkvMergePath.string(),
+      pathToUtf8(mkvMergePath),
       "-o",
-      toStdString(options.outputPath),
+      pathToUtf8(options.outputPath),
   };
   if (not options.useOriginalAudio and options.audioPath) {
     arguments.emplace_back("-A");
   }
-  arguments.emplace_back(toStdString(options.mkvPath));
+  arguments.emplace_back(pathToUtf8(options.mkvPath));
   if (options.subtitlePath) {
-    arguments.emplace_back(toStdString(*options.subtitlePath));
+    arguments.emplace_back(pathToUtf8(*options.subtitlePath));
   }
   if (options.audioPath) {
     if (options.useOriginalAudio) {
@@ -71,7 +78,7 @@ MkvMergeResult runMkvMergeTool(const RunMkvMergeOptions& options) {
         arguments.emplace_back("0:" + std::string(trackNameUtf8.data()));
       }
     }
-    arguments.emplace_back(toStdString(*options.audioPath));
+    arguments.emplace_back(pathToUtf8(*options.audioPath));
   }
 
   auto status = runSubprocess(std::move(arguments));
