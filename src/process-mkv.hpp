@@ -23,5 +23,10 @@ using MkvCombineTasks = std::vector<MkvCombineTask>;
 std::optional<MkvCombineTasks> makeMkvCombineTasks(ProcessMkvInput input);
 
 // notifyRemaining: (uint32_t taskRemaining, uint32_t taskCount) -> void
-void runMkvCombine(const fs::path& mkvToolnixPath, const MkvCombineTasks& tasks,
-                   const std::function<void(uint32_t, uint32_t)>& notifyRemaining);
+struct MkvCombineSummary {
+  uint32_t succeeded{0};
+  uint32_t failed{0};
+};
+
+MkvCombineSummary runMkvCombine(const fs::path& mkvMergeExecutable, const MkvCombineTasks& tasks,
+                                const std::function<void(uint32_t, uint32_t)>& notifyRemaining);
