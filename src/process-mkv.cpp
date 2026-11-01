@@ -141,6 +141,7 @@ std::optional<MkvCombineTasks> makeMkvCombineTasks(ProcessMkvInput input) {
         .mkvFile = mkvPath,
         .destination = *destination / mkvPath.filename(),
         .useOriginalAudio = input.useOriginalAudio,
+        .audioTrackName   = input.audioTrackName,
     };
 
     if (subDiffs) {
@@ -179,6 +180,7 @@ MkvCombineSummary runMkvCombine(const fs::path& mkvMergeExecutable, const MkvCom
         .subtitlePath     = tasks[i].subFile,
         .audioPath        = tasks[i].audioFile,
         .useOriginalAudio = tasks[i].useOriginalAudio,
+        .audioTrackName   = tasks[i].audioTrackName,
     };
 
     taskFuncs[i] = [opts]() -> TaskResult {
