@@ -1,4 +1,6 @@
+#include "folder-input.hpp"
 #include "string-utils.hpp"
+#include <cctype>
 
 namespace {
   std::string lowercaseExtension(const fs::path& path) {
@@ -15,7 +17,7 @@ namespace {
   }
 
   bool isSupportedAudioExtension(const fs::path& path) {
-    static const std::unordered_set<std::string> extensions{
+    static const std::set<std::string> extensions{
         ".mka", ".ac3", ".eac3", ".dts", ".thd",
         ".mp3", ".aac", ".m4a", ".mp4",
         ".ogg", ".oga", ".opus",
