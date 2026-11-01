@@ -42,7 +42,7 @@ MkvMergeResult runMkvMergeTool(const RunMkvMergeOptions& options) {
     return MkvMergeResult{.error = "nothing to merge"};
   }
 
-  auto mkvMergePath = options.mkvToolnixPath / "mkvmerge.exe";
+  const auto& mkvMergePath = options.mkvMergeExecutable;
   if (!fs::exists(mkvMergePath)) {
     return MkvMergeResult{.error = "mkv toolnix path is invalid"};
   }
