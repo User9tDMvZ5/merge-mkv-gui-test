@@ -13,7 +13,15 @@ namespace {
   }
 
   bool hasExtension(const fs::path& path, const fs::path& expected) {
-    return lowercaseExtension(path) == lowercaseExtension(expected);
+    auto expectedExtension = expected.string();
+    std::transform(expectedExtension.begin(), expectedExtension.end(),
+                   expectedExtension.begin(), [](unsigned char character) {
+                     return static_cast<char>(std::tolower(character));
+                   });
+    if (!expectedExtension.empty() && expectedExtension.front() != '.') {
+      expectedExtension.insert(expectedExtension.begin(), '.');
+    }
+    return lowercaseExtension(path) == expectedExtension;
   }
 
   bool isSupportedAudioExtension(const fs::path& path) {
