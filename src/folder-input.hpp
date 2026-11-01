@@ -11,6 +11,7 @@ enum class FolderInputFlags {
 
 class FolderInput : public wxBoxSizer, public IDropHandler {
   fs::path    extension_;
+  bool        acceptAudioExtensions_ = false;
   wxTextCtrl* extensionInput_ = nullptr;
 
   fs::path    baseDirectory_;
