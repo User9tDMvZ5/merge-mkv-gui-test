@@ -3,7 +3,8 @@
 
 FolderInput::FolderInput(wxWindow* parent, const wxString& title, fs::path extension,
                          FolderInputFlags flags)
-    : wxBoxSizer{wxVERTICAL}, extension_{extension},\n      acceptAudioExtensions_{!!(flags & FolderInputFlags::AudioExtensions)} {
+    : wxBoxSizer{wxVERTICAL}, extension_{extension},
+      acceptAudioExtensions_{!!(flags & FolderInputFlags::AudioExtensions)} {
   auto* text = new wxStaticText{parent, wxID_ANY, title};
   this->Add(text, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
 
