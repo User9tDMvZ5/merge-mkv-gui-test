@@ -16,16 +16,16 @@ namespace {
     std::transform(arguments.begin(), arguments.end(), cmd.begin(),
                    [](const auto& s) { return s.c_str(); });
 
-    std::string joinedCmd = "";
-    for (const auto& arg : cmd) {
-      if (arg != nullptr) {
-        joinedCmd = joinedCmd + " " + arg;
-      }
+    wxString joinedCmd;
+    for (const auto& argument : arguments) {
+      if (!joinedCmd.empty()) joinedCmd += " ";
+      joinedCmd += "\"";
+      joinedCmd += wxString::FromUTF8(argument.c_str());
+      joinedCmd += "\"";
     }
-    // The command line is UTF-8, but wxLog's narrow %s overload may use the
-    // active Windows code page. Decode it explicitly before writing the log.
-    const wxString loggedCommand = wxString::FromUTF8(joinedCmd);
-    wxLogInfo("run mkv merge: %s", loggedCommand);
+    // Decode UTF-8 explicitly: narrow %s logging can use the active Windows
+    // code page and corrupt Cyrillic characters.
+    wxLogInfo("run mkv merge: %s", joinedCmd);
 
     auto subprocess = subprocess_s{};
     if (int result = subprocess_create(cmd.data(), 0, &subprocess); result != 0) {
