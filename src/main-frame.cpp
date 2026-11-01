@@ -69,6 +69,11 @@ MainFrame::MainFrame() : wxFrame{nullptr, wxID_ANY, "merge mkv"} {
     grid->Add(subsFolderInput, 1, wxEXPAND);
     grid->Add(audioFolderInput, 1, wxEXPAND);
 
+    audioTrackName_ = new wxTextCtrl{this, wxID_ANY, wxEmptyString};
+    auto* audioTrackNameRow = new wxBoxSizer{wxHORIZONTAL};
+    audioTrackNameRow->Add(new wxStaticText{this, wxID_ANY, "Audio track name:"}, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
+    audioTrackNameRow->Add(audioTrackName_, 1, wxEXPAND);
+
     processButton_ = new wxButton{this, ID_Process, wxT("process")};
     Bind(wxEVT_BUTTON, &MainFrame::OnProcess, this, ID_Process);
 
@@ -79,6 +84,7 @@ MainFrame::MainFrame() : wxFrame{nullptr, wxID_ANY, "merge mkv"} {
 
     auto* topBox = new wxBoxSizer{wxVERTICAL};
     topBox->Add(grid, 1, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 10);
+    topBox->Add(audioTrackNameRow, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 15);
     topBox->Add(processThing, 0, wxGROW | wxALL, 15);
     SetSizer(topBox);
 
@@ -121,6 +127,7 @@ void MainFrame::OnProcess(wxCommandEvent&) {
   updateInProgress_ = true;
   processButton_->Disable();
   bool useOriginalAudio = useOriginalAudio_->GetValue();
+  const wxString audioTrackName = audioTrackName_->GetValue();
 
   auto tasks = makeMkvCombineTasks(ProcessMkvInput{
       .mkvsDirectory    = mkvFolderInput->getBaseDirectory(),
@@ -128,6 +135,7 @@ void MainFrame::OnProcess(wxCommandEvent&) {
       .subs             = std::move(subsFolderInput->getFilteredFileList()),
       .audios           = std::move(audioFolderInput->getFilteredFileList()),
       .useOriginalAudio = useOriginalAudio,
+      .audioTrackName   = audioTrackName,
   });
 
   if (!tasks) {
