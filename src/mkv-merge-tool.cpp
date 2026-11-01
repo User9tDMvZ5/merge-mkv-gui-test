@@ -28,7 +28,7 @@ namespace {
     if (length <= 0) {
       return std::nullopt;
     }
-    std::wstring result(static_cast<size_t>(length), L'\\0');
+    std::wstring result(static_cast<size_t>(length), L'\0');
     if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(),
                             static_cast<int>(value.size()), result.data(),
                             length) != length) {
@@ -42,20 +42,20 @@ namespace {
     std::wstring result = L"\"";
     size_t backslashes = 0;
     for (const wchar_t character : value) {
-      if (character == L'\\\\') {
+      if (character == L'\\') {
         ++backslashes;
-      } else if (character == L'\"') {
-        result.append(backslashes * 2 + 1, L'\\\\');
-        result += L'\"';
+      } else if (character == L'"') {
+        result.append(backslashes * 2 + 1, L'\\');
+        result += L'"';
         backslashes = 0;
       } else {
-        result.append(backslashes, L'\\\\');
+        result.append(backslashes, L'\\');
         result += character;
         backslashes = 0;
       }
     }
-    result.append(backslashes * 2, L'\\\\');
-    result += L'\"';
+    result.append(backslashes * 2, L'\\');
+    result += L'"';
     return result;
   }
 
@@ -92,10 +92,9 @@ namespace {
     startupInfo.cb = sizeof(startupInfo);
     PROCESS_INFORMATION processInfo{};
 
-    // CREATE_NEW_CONSOLE gives mkvmerge its own visible console window, with
-    // stdout/stderr connected to that console so --gui-mode progress is shown.
+    // Give mkvmerge a separate visible console for its progress output.
     std::vector<wchar_t> mutableCommandLine(commandLine.begin(), commandLine.end());
-    mutableCommandLine.push_back(L'\\0');
+    mutableCommandLine.push_back(L'\0');
     if (!CreateProcessW(wideArguments.front().c_str(), mutableCommandLine.data(),
                         nullptr, nullptr, FALSE, CREATE_NEW_CONSOLE, nullptr,
                         nullptr, &startupInfo, &processInfo)) {
@@ -119,9 +118,15 @@ namespace {
     const BOOL gotExitCode = GetExitCodeProcess(processInfo.hProcess, &exitCode);
     CloseHandle(processInfo.hProcess);
     if (!gotExitCode) {
+      const DWORD error = GetLastError();
       wxLogError("Cannot read mkvmerge exit code; Windows error: %lu",
-                 static_cast<unsigned long>(GetLastError()));
+                 static_cast<unsigned long>(error));
       return std::nullopt;
+    }
+
+    if (exitCode != 0) {
+      wxLogError("mkvmerge returned exit code %lu",
+                 static_cast<unsigned long>(exitCode));
     }
     return static_cast<int>(exitCode);
   }
