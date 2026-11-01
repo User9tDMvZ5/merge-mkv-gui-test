@@ -85,30 +85,33 @@ std::optional<MkvCombineTasks> makeMkvCombineTasks(ProcessMkvInput input) {
   auto mkvDiffs = diffPath(input.mkvs);
   mErrorIf(!mkvDiffs, "can't determine different parts in mkv files");
 
-  auto subDiffs   = std::optional<PathDiff>{};
-  auto audioDiffs = std::optional<PathDiff>{};
+  auto mkvNumbers = makeNumberedPaths(input.mkvs);
+  mErrorIf(!mkvNumbers, "MKV filenames must start with a number followed by ')', e.g. 1) video.mkv");
 
+  auto subDiffs = std::optional<PathDiff>{};
   if (!input.subs.empty()) {
     subDiffs = diffPath(input.subs);
-    mErrorIf(!subDiffs, "can't determine different parts in sub files");
-    mErrorIf(!hasSmthInCommon(*subDiffs, *mkvDiffs), "can't find common subs for mkvs");
+    mErrorIf(!subDiffs, "can't determine different parts in subtitle files");
   }
 
+  auto audioNumbers = std::optional<NumberedPaths>{};
   if (!input.audios.empty()) {
-    audioDiffs = diffPath(input.audios);
-    mErrorIf(!audioDiffs, "can't determine different parts in audio files");
-    mErrorIf(!hasSmthInCommon(*audioDiffs, *mkvDiffs), "can't find common audios for mkvs");
+    audioNumbers = makeNumberedPaths(input.audios);
+    mErrorIf(!audioNumbers, "Audio filenames must start with a number followed by ')', e.g. 1) audio.ac3");
+    for (const auto& [number, mkvPath] : *mkvNumbers) {
+      mErrorIf(!audioNumbers->contains(number),
+               (std::string{"No matching audio file for: "} + mkvPath.filename().string()).c_str());
+    }
   }
 
   auto destination = makeMergedDirectory(input.mkvsDirectory);
   mErrorIf(!destination, "can't create merged folder");
 
   auto tasks = MkvCombineTasks{};
-
   for (const auto& [mkvDiff, mkvPath] : *mkvDiffs) {
     auto task = MkvCombineTask{
-        .mkvFile          = mkvPath,
-        .destination      = *destination / mkvPath.filename(),
+        .mkvFile = mkvPath,
+        .destination = *destination / mkvPath.filename(),
         .useOriginalAudio = input.useOriginalAudio,
     };
 
@@ -118,17 +121,18 @@ std::optional<MkvCombineTasks> makeMkvCombineTasks(ProcessMkvInput input) {
       }
     }
 
-    if (audioDiffs) {
-      if (auto it = audioDiffs->find(mkvDiff); it != audioDiffs->end()) {
-        task.audioFile = it->second;
+    if (audioNumbers) {
+      auto number = numberedPrefix(mkvPath);
+      if (number) {
+        if (auto it = audioNumbers->find(*number); it != audioNumbers->end()) {
+          task.audioFile = it->second;
+        }
       }
     }
-
     tasks.emplace_back(std::move(task));
   }
 
   logTasks(tasks);
-
   return tasks;
 }
 
