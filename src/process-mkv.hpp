@@ -7,6 +7,7 @@ struct ProcessMkvInput {
   std::vector<fs::path> subs;
   std::vector<fs::path> audios;
   bool                  useOriginalAudio;
+  wxString              audioTrackName;
 };
 
 struct MkvCombineTask {
@@ -15,6 +16,7 @@ struct MkvCombineTask {
   std::optional<fs::path> subFile;
   std::optional<fs::path> audioFile;
   bool                    useOriginalAudio;
+  wxString                audioTrackName;
 };
 
 using MkvCombineTasks = std::vector<MkvCombineTask>;
