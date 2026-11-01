@@ -2,6 +2,7 @@
 #include "string-utils.hpp"
 #include "thread-pool.hpp"
 #include "mkv-merge-tool.hpp"
+#include <cctype>
 
 
 #define mErrorIf(cond, message)                                             \
@@ -37,6 +38,34 @@ namespace {
       result[differPart] = paths[i];
     }
 
+    return result;
+  }
+
+
+  // Match media by a leading episode number: "12) title.mkv", "12) audio.ac3".
+  std::optional<std::string> numberedPrefix(const fs::path& path) {
+    auto name = path.stem().string();
+    size_t pos = 0;
+    while (pos < name.size() && std::isdigit(static_cast<unsigned char>(name[pos]))) ++pos;
+    if (pos == 0) return std::nullopt;
+    const auto digitsEnd = pos;
+    while (pos < name.size() && std::isspace(static_cast<unsigned char>(name[pos]))) ++pos;
+    if (pos >= name.size() || name[pos] != ')') return std::nullopt;
+    auto number = name.substr(0, digitsEnd);
+    const auto firstNonZero = number.find_first_not_of('0');
+    return firstNonZero == std::string::npos ? std::optional<std::string>{"0"}
+                                             : std::optional<std::string>{number.substr(firstNonZero)};
+  }
+
+  using NumberedPaths = std::map<std::string, fs::path>;
+
+  std::optional<NumberedPaths> makeNumberedPaths(const std::vector<fs::path>& paths) {
+    NumberedPaths result;
+    for (const auto& path : paths) {
+      auto number = numberedPrefix(path);
+      if (!number || result.contains(*number)) return std::nullopt;
+      result.emplace(*number, path);
+    }
     return result;
   }
 
