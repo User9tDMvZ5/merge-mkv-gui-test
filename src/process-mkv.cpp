@@ -161,8 +161,8 @@ std::optional<MkvCombineTasks> makeMkvCombineTasks(ProcessMkvInput input) {
 }
 
 
-void runMkvCombine(const fs::path& mkvToolnixPath, const MkvCombineTasks& tasks,
-                   const std::function<void(uint32_t, uint32_t)>& notifyRemaining) {
+MkvCombineSummary runMkvCombine(const fs::path& mkvMergeExecutable, const MkvCombineTasks& tasks,
+                                const std::function<void(uint32_t, uint32_t)>& notifyRemaining) {
   wxLogInfo("runMkvCombine(%d);", (int)tasks.size());
 
   struct TaskResult {
@@ -173,7 +173,7 @@ void runMkvCombine(const fs::path& mkvToolnixPath, const MkvCombineTasks& tasks,
 
   for (size_t i = 0; i < tasks.size(); ++i) {
     auto opts = RunMkvMergeOptions{
-        .mkvToolnixPath   = mkvToolnixPath,
+        .mkvMergeExecutable = mkvMergeExecutable,
         .outputPath       = tasks[i].destination,
         .mkvPath          = tasks[i].mkvFile,
         .subtitlePath     = tasks[i].subFile,
@@ -202,7 +202,15 @@ void runMkvCombine(const fs::path& mkvToolnixPath, const MkvCombineTasks& tasks,
   pool.waitAndExit();
   auto results = pool.getResults();
 
+  MkvCombineSummary summary;
   for (const auto& result : results) {
-    wxLogInfo("task status: %s", result.error ? *result.error : "<OK>");
+    if (result.error) {
+      ++summary.failed;
+      wxLogError("task failed: %s", *result.error);
+    } else {
+      ++summary.succeeded;
+      wxLogInfo("task status: <OK>");
+    }
   }
+  return summary;
 }
