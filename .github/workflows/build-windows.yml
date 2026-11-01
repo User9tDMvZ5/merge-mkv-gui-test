@@ -1,0 +1,70 @@
+
+name: Build Merge MKV GUI for Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup CMake
+        run: cmake --version
+
+      - name: Download wxWidgets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path deps | Out-Null
+          git clone --depth 1 --branch v3.3.0 --recurse-submodules https://github.com/wxWidgets/wxWidgets.git deps/wxWidgets
+
+      - name: Download subprocess
+        run: |
+          git clone --depth 1 https://github.com/sheredom/subprocess.h.git deps/subprocess
+
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build -A x64 -DwxBUILD_SHARED=OFF -DwxUSE_RC_MANIFEST=ON
+
+      - name: Build Release
+        run: |
+          cmake --build build --config Release --target merge-mkv-gui --parallel
+
+      - name: Prepare portable folder
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path build -Recurse -Filter "merge-mkv-gui.exe" |
+            Select-Object -First 1
+
+          if (-not $exe) {
+            throw "merge-mkv-gui.exe was not found!"
+          }
+
+          New-Item -ItemType Directory -Force -Path dist/MergeMKV | Out-Null
+
+          Copy-Item $exe.FullName dist/MergeMKV/MergeMKV.exe
+
+          @"
+          Merge MKV GUI - Windows x64
+
+          Launch MergeMKV.exe to start the application.
+
+          MKVToolNix is required to use this application.
+          "@ | Set-Content dist/MergeMKV/README.txt
+
+          Compress-Archive -Path dist/MergeMKV/* `
+            -DestinationPath dist/MergeMKV-Windows-x64.zip -Force
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: MergeMKV-Windows-x64
+          path: dist/MergeMKV-Windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14
