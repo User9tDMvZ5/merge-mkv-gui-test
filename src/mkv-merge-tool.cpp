@@ -90,6 +90,8 @@ namespace {
 
     STARTUPINFOW startupInfo{};
     startupInfo.cb = sizeof(startupInfo);
+    startupInfo.dwFlags = STARTF_USESHOWWINDOW;
+    startupInfo.wShowWindow = SW_SHOWMINNOACTIVE;
     PROCESS_INFORMATION processInfo{};
 
     // Give mkvmerge a separate visible console for its progress output.
