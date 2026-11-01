@@ -60,11 +60,18 @@ MkvMergeResult runMkvMergeTool(const RunMkvMergeOptions& options) {
     arguments.emplace_back(toStdString(*options.subtitlePath));
   }
   if (options.audioPath) {
-    arguments.emplace_back(toStdString(*options.audioPath));
     if (options.useOriginalAudio) {
       arguments.emplace_back("--default-language");
       arguments.emplace_back("rus");
     }
+    if (!options.audioTrackName.empty()) {
+      const auto trackNameUtf8 = options.audioTrackName.ToUTF8();
+      if (trackNameUtf8.data() != nullptr) {
+        arguments.emplace_back("--track-name");
+        arguments.emplace_back("0:" + std::string(trackNameUtf8.data()));
+      }
+    }
+    arguments.emplace_back(toStdString(*options.audioPath));
   }
 
   auto status = runSubprocess(std::move(arguments));
