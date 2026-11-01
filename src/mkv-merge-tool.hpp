@@ -3,12 +3,13 @@
 
 
 struct RunMkvMergeOptions {
-  fs::path                mkvToolnixPath;
+  fs::path                mkvMergeExecutable;
   fs::path                outputPath;
   fs::path                mkvPath;
   std::optional<fs::path> subtitlePath;
   std::optional<fs::path> audioPath;
   bool                    useOriginalAudio;
+  wxString                audioTrackName;
 };
 
 struct MkvMergeResult {

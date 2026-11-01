@@ -1,9 +1,51 @@
 #include "folder-input.hpp"
 #include "string-utils.hpp"
+#include <cctype>
+
+namespace {
+  std::string lowercaseExtension(const fs::path& path) {
+    auto extension = path.extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(),
+                   [](unsigned char character) {
+                     return static_cast<char>(std::tolower(character));
+                   });
+    return extension;
+  }
+
+  bool hasExtension(const fs::path& path, const fs::path& expected) {
+    auto expectedExtension = expected.string();
+    std::transform(expectedExtension.begin(), expectedExtension.end(),
+                   expectedExtension.begin(), [](unsigned char character) {
+                     return static_cast<char>(std::tolower(character));
+                   });
+    if (!expectedExtension.empty() && expectedExtension.front() != '.') {
+      expectedExtension.insert(expectedExtension.begin(), '.');
+    }
+    return lowercaseExtension(path) == expectedExtension;
+  }
+
+  bool isSupportedAudioExtension(const fs::path& path) {
+    static const std::set<std::string> extensions{
+        ".mka", ".ac3", ".eac3", ".dts", ".thd",
+        ".mp3", ".aac", ".m4a", ".mp4",
+        ".ogg", ".oga", ".opus",
+        ".flac", ".wav", ".wma",
+        ".aif", ".aiff", ".ape", ".tta", ".wv",
+    };
+    return extensions.contains(lowercaseExtension(path));
+  }
+
+  bool shouldShowFile(const fs::path& path, const fs::path& extension,
+                      bool acceptAudioExtensions) {
+    return extension.empty() || hasExtension(path, extension) ||
+           (acceptAudioExtensions && isSupportedAudioExtension(path));
+  }
+}
 
 FolderInput::FolderInput(wxWindow* parent, const wxString& title, fs::path extension,
                          FolderInputFlags flags)
-    : wxBoxSizer{wxVERTICAL}, extension_{extension} {
+    : wxBoxSizer{wxVERTICAL}, extension_{extension},
+      acceptAudioExtensions_{!!(flags & FolderInputFlags::AudioExtensions)} {
   auto* text = new wxStaticText{parent, wxID_ANY, title};
   this->Add(text, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
 
@@ -32,7 +74,7 @@ std::vector<fs::path> FolderInput::getFilteredFileList() const {
   std::vector<fs::path> paths;
 
   for (const auto& path : allFiles_) {
-    if (extension_.empty() || path.extension() == extension_) {
+    if (shouldShowFile(path, extension_, acceptAudioExtensions_)) {
       paths.push_back(path);
     }
   }
@@ -113,7 +155,7 @@ void FolderInput::updateControl() {
   stringArr.Alloc(allFiles_.size());
 
   for (const auto& path : allFiles_) {
-    if (extension_.empty() || path.extension() == extension_) {
+    if (shouldShowFile(path, extension_, acceptAudioExtensions_)) {
       stringArr.Add(toWxString(path.filename()));
     }
   }

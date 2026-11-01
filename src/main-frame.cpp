@@ -3,6 +3,9 @@
 #include "process-mkv.hpp"
 #include "wx/msw/checkbox.h"
 #include "wx/sizer.h"
+#include "wx/config.h"
+#include "wx/filedlg.h"
+#include "wx/stdpaths.h"
 
 
 namespace {
@@ -26,15 +29,20 @@ MainFrame::MainFrame() : wxFrame{nullptr, wxID_ANY, "merge mkv"} {
     auto* menuFile = new wxMenu{};
     menuFile->Append(wxID_EXIT);
 
+    auto* menuSettings = new wxMenu{};
+    menuSettings->Append(ID_SelectMkvMerge, "Select MKVToolNix executable...");
+
     auto* menuHelp = new wxMenu{};
     menuHelp->Append(wxID_ABOUT);
 
     auto* menuBar = new wxMenuBar{};
     menuBar->Append(menuFile, "&File");
+    menuBar->Append(menuSettings, "&Settings");
     menuBar->Append(menuHelp, "&Help");
     SetMenuBar(menuBar);
 
     Bind(wxEVT_MENU, &MainFrame::OnAbout, this, wxID_ABOUT);
+    Bind(wxEVT_MENU, &MainFrame::OnSelectMkvMerge, this, ID_SelectMkvMerge);
     Bind(wxEVT_MENU, &MainFrame::OnExit, this, wxID_EXIT);
   }
 
@@ -48,7 +56,8 @@ MainFrame::MainFrame() : wxFrame{nullptr, wxID_ANY, "merge mkv"} {
   {
     mkvFolderInput   = new FolderInput{this, "mkv dir:", ".mkv", FolderInputFlags::AskExtension};
     subsFolderInput  = new FolderInput{this, "subs dir:", ".ass", FolderInputFlags::AskExtension};
-    audioFolderInput = new FolderInput{this, "audio dir:", ".mka", FolderInputFlags::AskExtension};
+    audioFolderInput = new FolderInput{this, "audio dir:", ".mka",
+                                      FolderInputFlags::AskExtension | FolderInputFlags::AudioExtensions};
     SetDropTarget(new DropBox{{mkvFolderInput, subsFolderInput, audioFolderInput}});
 
     constexpr int rows = 1;
@@ -60,6 +69,11 @@ MainFrame::MainFrame() : wxFrame{nullptr, wxID_ANY, "merge mkv"} {
     grid->Add(subsFolderInput, 1, wxEXPAND);
     grid->Add(audioFolderInput, 1, wxEXPAND);
 
+    audioTrackName_ = new wxTextCtrl{this, wxID_ANY, wxEmptyString};
+    auto* audioTrackNameRow = new wxBoxSizer{wxHORIZONTAL};
+    audioTrackNameRow->Add(new wxStaticText{this, wxID_ANY, "Audio track name:"}, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
+    audioTrackNameRow->Add(audioTrackName_, 1, wxEXPAND);
+
     processButton_ = new wxButton{this, ID_Process, wxT("process")};
     Bind(wxEVT_BUTTON, &MainFrame::OnProcess, this, ID_Process);
 
@@ -70,6 +84,7 @@ MainFrame::MainFrame() : wxFrame{nullptr, wxID_ANY, "merge mkv"} {
 
     auto* topBox = new wxBoxSizer{wxVERTICAL};
     topBox->Add(grid, 1, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 10);
+    topBox->Add(audioTrackNameRow, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 15);
     topBox->Add(processThing, 0, wxGROW | wxALL, 15);
     SetSizer(topBox);
 
@@ -81,6 +96,7 @@ MainFrame::MainFrame() : wxFrame{nullptr, wxID_ANY, "merge mkv"} {
 
   Connect(wxEVT_MKV_PROCESS_STATUS_UPDATE, wxThreadEventHandler(MainFrame::OnProcessStatusUpdate));
 
+  LoadMkvMergePath();
   wxLogInfo("main frame created");
 }
 
@@ -111,6 +127,7 @@ void MainFrame::OnProcess(wxCommandEvent&) {
   updateInProgress_ = true;
   processButton_->Disable();
   bool useOriginalAudio = useOriginalAudio_->GetValue();
+  const wxString audioTrackName = audioTrackName_->GetValue();
 
   auto tasks = makeMkvCombineTasks(ProcessMkvInput{
       .mkvsDirectory    = mkvFolderInput->getBaseDirectory(),
@@ -118,6 +135,7 @@ void MainFrame::OnProcess(wxCommandEvent&) {
       .subs             = std::move(subsFolderInput->getFilteredFileList()),
       .audios           = std::move(audioFolderInput->getFilteredFileList()),
       .useOriginalAudio = useOriginalAudio,
+      .audioTrackName   = audioTrackName,
   });
 
   if (!tasks) {
@@ -126,12 +144,19 @@ void MainFrame::OnProcess(wxCommandEvent&) {
     return;
   }
 
-  // TODO: make this persistent setting in app
-  auto  mkvToolnixPath = fs::path{"C:\\Program Files\\MKVToolNix"};
-  auto* instance       = this;
+  if (mkvMergeExecutable_.empty() || !fs::exists(mkvMergeExecutable_)) {
+    wxMessageBox("MKVToolNix was not found. Use Settings > Select MKVToolNix executable.",
+                 "MKVToolNix not found", wxICON_ERROR | wxOK | wxCENTRE);
+    updateInProgress_ = false;
+    processButton_->Enable(true);
+    return;
+  }
 
-  auto action = [instance, mkvToolnixPath, tasks]() {
-    runMkvCombine(mkvToolnixPath, *tasks, [instance](uint32_t taskRemaining, uint32_t taskCount) {
+  auto  mkvMergeExecutable = mkvMergeExecutable_;
+  auto* instance = this;
+
+  auto action = [instance, mkvMergeExecutable, tasks]() {
+    auto summary = runMkvCombine(mkvMergeExecutable, *tasks, [instance](uint32_t taskRemaining, uint32_t taskCount) {
       auto  tasksDone = taskCount - taskRemaining;
       auto  status    = wxString::Format("processing... %u/%u", tasksDone, taskCount);
       auto* evt       = new wxThreadEvent{wxEVT_MKV_PROCESS_STATUS_UPDATE};
@@ -140,7 +165,8 @@ void MainFrame::OnProcess(wxCommandEvent&) {
     });
 
     auto* evt = new wxThreadEvent{wxEVT_MKV_PROCESS_STATUS_UPDATE};
-    evt->SetString("processing done!");
+    evt->SetString(wxString::Format("processing finished: %u succeeded, %u failed",
+                                    summary.succeeded, summary.failed));
     wxQueueEvent(instance, evt);
   };
 
@@ -148,10 +174,51 @@ void MainFrame::OnProcess(wxCommandEvent&) {
 }
 
 
+void MainFrame::OnSelectMkvMerge(wxCommandEvent&) {
+  wxFileDialog dialog(this, "Select mkvmerge.exe", "", "mkvmerge.exe",
+                      "mkvmerge.exe (mkvmerge.exe)|mkvmerge.exe|Executable files (*.exe)|*.exe",
+                      wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+  if (dialog.ShowModal() != wxID_OK) return;
+
+  mkvMergeExecutable_ = fs::path{dialog.GetPath().ToStdWstring()};
+  wxConfig config("MergeMKV");
+  config.Write("MkvMergeExecutable", dialog.GetPath());
+  config.Flush();
+  SetStatusText("MKVToolNix: " + dialog.GetFilename());
+}
+
+void MainFrame::LoadMkvMergePath() {
+  wxConfig config("MergeMKV");
+  wxString savedPath;
+  if (config.Read("MkvMergeExecutable", &savedPath) && !savedPath.empty()) {
+    fs::path candidate{savedPath.ToStdWstring()};
+    if (fs::exists(candidate)) {
+      mkvMergeExecutable_ = candidate;
+      return;
+    }
+  }
+
+  std::vector<fs::path> candidates;
+  const auto executable = fs::path{wxStandardPaths::Get().GetExecutablePath().ToStdWstring()};
+  candidates.push_back(executable.parent_path() / "mkvmerge.exe");
+  candidates.push_back(fs::current_path() / "mkvmerge.exe");
+  candidates.push_back(fs::path{L"C:\\Program Files\\MKVToolNix\\mkvmerge.exe"});
+  candidates.push_back(fs::path{L"C:\\Program Files (x86)\\MKVToolNix\\mkvmerge.exe"});
+
+  for (const auto& candidate : candidates) {
+    if (fs::exists(candidate)) {
+      mkvMergeExecutable_ = candidate;
+      config.Write("MkvMergeExecutable", wxString{candidate.wstring()});
+      config.Flush();
+      return;
+    }
+  }
+}
+
 void MainFrame::OnProcessStatusUpdate(wxThreadEvent& event) {
   SetStatusText(event.GetString());
 
-  if (event.GetString() == "processing done!") {
+  if (event.GetString().StartsWith("processing finished:")) {
     updateInProgress_ = false;
     processButton_->Enable(true);
   }

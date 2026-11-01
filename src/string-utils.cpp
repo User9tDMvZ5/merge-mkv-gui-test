@@ -5,15 +5,17 @@ wxString toWxString(const fs::path& path) {
   try {
     return wxString(path.generic_wstring());
   } catch (const std::exception& ex) {
-    wxLogError("path convertion failed: %s", ex.what());
+    wxLogError("path conversion failed: %s", ex.what());
     abort();
   }
 #else
-  auto str = path.u8string();
-  return wxString::FromUTF8Unchecked((const char*)str.c_str());
+  const auto utf8 = path.u8string();
+  return wxString::FromUTF8Unchecked(
+      reinterpret_cast<const char*>(utf8.c_str()));
 #endif
 }
 
 std::string toStdString(const fs::path& path) {
-  return toWxString(path).c_str().AsChar();
+  const auto utf8 = path.u8string();
+  return std::string(reinterpret_cast<const char*>(utf8.data()), utf8.size());
 }
