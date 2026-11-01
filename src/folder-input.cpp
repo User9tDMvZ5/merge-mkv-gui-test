@@ -3,7 +3,7 @@
 
 FolderInput::FolderInput(wxWindow* parent, const wxString& title, fs::path extension,
                          FolderInputFlags flags)
-    : wxBoxSizer{wxVERTICAL}, extension_{extension} {
+    : wxBoxSizer{wxVERTICAL}, extension_{extension},\n      acceptAudioExtensions_{!!(flags & FolderInputFlags::AudioExtensions)} {
   auto* text = new wxStaticText{parent, wxID_ANY, title};
   this->Add(text, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
 
@@ -33,7 +33,7 @@ std::vector<fs::path> FolderInput::getFilteredFileList() const {
 
   for (const auto& path : allFiles_) {
     if (extension_.empty() || path.extension() == extension_ ||
-        (extension_ == ".mka" && path.extension() == ".ac3")) {
+        (acceptAudioExtensions_ && (path.extension() == ".mka" || path.extension() == ".ac3"))) {
       paths.push_back(path);
     }
   }
@@ -115,7 +115,7 @@ void FolderInput::updateControl() {
 
   for (const auto& path : allFiles_) {
     if (extension_.empty() || path.extension() == extension_ ||
-        (extension_ == ".mka" && path.extension() == ".ac3")) {
+        (acceptAudioExtensions_ && (path.extension() == ".mka" || path.extension() == ".ac3"))) {
       stringArr.Add(toWxString(path.filename()));
     }
   }
