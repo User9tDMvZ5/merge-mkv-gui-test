@@ -9,6 +9,7 @@ class MainFrame : public wxFrame {
   FolderInput* audioFolderInput;
   wxButton*    processButton_;
   wxCheckBox*  useOriginalAudio_;
+  wxTextCtrl* audioTrackName_;
   fs::path     mkvMergeExecutable_;
   bool         updateInProgress_{false};
 
