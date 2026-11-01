@@ -28,20 +28,53 @@ namespace {
     wxLogInfo("run mkv merge: %s", joinedCmd);
 
     auto subprocess = subprocess_s{};
-    if (int result = subprocess_create(cmd.data(), 0, &subprocess); result != 0) {
+    constexpr int subprocessOptions =
+        subprocess_option_inherit_environment |
+        subprocess_option_no_window |
+        subprocess_option_enable_async |
+        subprocess_option_combined_stdout_stderr;
+
+    if (int result = subprocess_create(cmd.data(), subprocessOptions, &subprocess);
+        result != 0) {
+      wxLogError("Cannot start mkvmerge; subprocess_create error: %d", result);
       return std::nullopt;
     }
 
-    //  FILE* processStdOut = subprocess_stdout( &subprocess );
-    //  FILE* processStdErr = subprocess_stderr( &subprocess );
+    // Read the combined stdout/stderr while mkvmerge is running. Draining the
+    // pipe is important: otherwise a full pipe can block the child process.
+    char buffer[4096];
+    for (;;) {
+      const unsigned bytesRead =
+          subprocess_read_stdout(&subprocess, buffer, sizeof(buffer));
+      if (bytesRead == 0) {
+        break;
+      }
 
-    int processReturn;
-    if (int result = subprocess_join(&subprocess, &processReturn); result != 0) {
+      // The parent application is expected to be launched from a console.
+      // Preserve mkvmerge's UTF-8 output exactly as emitted.
+      if (std::fwrite(buffer, 1, bytesRead, stdout) != bytesRead) {
+        wxLogWarning("Could not write all mkvmerge output to the parent console");
+      }
+      std::fflush(stdout);
+    }
+
+    int processReturn = -1;
+    const int joinResult = subprocess_join(&subprocess, &processReturn);
+    const int destroyResult = subprocess_destroy(&subprocess);
+
+    if (joinResult != 0) {
+      wxLogError("Could not wait for mkvmerge to finish; subprocess_join error: %d",
+                 joinResult);
       return std::nullopt;
     }
-    if (int result = subprocess_destroy(&subprocess); result != 0) {
+    if (destroyResult != 0) {
+      wxLogError("Could not release mkvmerge process resources; subprocess_destroy error: %d",
+                 destroyResult);
       return std::nullopt;
     }
+
+    std::printf("\n[mkvmerge] Process finished with exit code %d\n", processReturn);
+    std::fflush(stdout);
     return processReturn;
   }
 }  // namespace
@@ -59,6 +92,7 @@ MkvMergeResult runMkvMergeTool(const RunMkvMergeOptions& options) {
 
   auto arguments = std::vector<std::string>{
       pathToUtf8(mkvMergePath),
+      "--gui-mode",
       "-o",
       pathToUtf8(options.outputPath),
   };
