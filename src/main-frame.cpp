@@ -48,7 +48,7 @@ MainFrame::MainFrame() : wxFrame{nullptr, wxID_ANY, "merge mkv"} {
   {
     mkvFolderInput   = new FolderInput{this, "mkv dir:", ".mkv", FolderInputFlags::AskExtension};
     subsFolderInput  = new FolderInput{this, "subs dir:", ".ass", FolderInputFlags::AskExtension};
-    audioFolderInput = new FolderInput{this, "audio dir:", ".mka", FolderInputFlags::AskExtension};
+    audioFolderInput = new FolderInput{this, "audio dir:", ".mka",\n                                      FolderInputFlags::AskExtension | FolderInputFlags::AudioExtensions};
     SetDropTarget(new DropBox{{mkvFolderInput, subsFolderInput, audioFolderInput}});
 
     constexpr int rows = 1;
