@@ -9,6 +9,7 @@ class MainFrame : public wxFrame {
   FolderInput* audioFolderInput;
   wxButton*    processButton_;
   wxCheckBox*  useOriginalAudio_;
+  fs::path     mkvMergeExecutable_;
   bool         updateInProgress_{false};
 
  public:
@@ -18,10 +19,13 @@ class MainFrame : public wxFrame {
   void OnExit(wxCommandEvent& event);
   void OnAbout(wxCommandEvent& event);
   void OnProcess(wxCommandEvent& event);
+  void OnSelectMkvMerge(wxCommandEvent& event);
+  void LoadMkvMergePath();
   void OnProcessStatusUpdate(wxThreadEvent& event);
 };
 
 enum {
   ID_Process          = 1,
   ID_UseOriginalAudio = 2,
+  ID_SelectMkvMerge   = 3,
 };
