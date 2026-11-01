@@ -1,6 +1,5 @@
 #include "process-mkv.hpp"
 #include "string-utils.hpp"
-#include "thread-pool.hpp"
 #include "mkv-merge-tool.hpp"
 #include <cctype>
 
@@ -166,53 +165,42 @@ MkvCombineSummary runMkvCombine(const fs::path& mkvMergeExecutable, const MkvCom
                                 const std::function<void(uint32_t, uint32_t)>& notifyRemaining) {
   wxLogInfo("runMkvCombine(%d);", (int)tasks.size());
 
-  struct TaskResult {
-    std::optional<const char*> error;
-  };
+  MkvCombineSummary summary;
+  const auto taskCount = static_cast<uint32_t>(tasks.size());
 
-  auto taskFuncs = std::vector<std::function<TaskResult()>>(tasks.size());
-
+  // Process files one by one. This avoids launching several heavy mkvmerge
+  // instances at once and makes progress correspond to completed files.
   for (size_t i = 0; i < tasks.size(); ++i) {
+    const auto& task = tasks[i];
     auto opts = RunMkvMergeOptions{
         .mkvMergeExecutable = mkvMergeExecutable,
-        .outputPath       = tasks[i].destination,
-        .mkvPath          = tasks[i].mkvFile,
-        .subtitlePath     = tasks[i].subFile,
-        .audioPath        = tasks[i].audioFile,
-        .useOriginalAudio = tasks[i].useOriginalAudio,
-        .audioTrackName   = tasks[i].audioTrackName,
+        .outputPath         = task.destination,
+        .mkvPath            = task.mkvFile,
+        .subtitlePath       = task.subFile,
+        .audioPath          = task.audioFile,
+        .useOriginalAudio   = task.useOriginalAudio,
+        .audioTrackName     = task.audioTrackName,
     };
 
-    taskFuncs[i] = [opts]() -> TaskResult {
-      auto r = runMkvMergeTool(opts);
-      return TaskResult{.error = r.error};
-    };
-  }
+    wxLogInfo("Starting merge task %u/%u: %s",
+              static_cast<unsigned>(i + 1), taskCount,
+              toWxString(task.mkvFile.filename()));
 
-  auto pool = ThreadPool<TaskResult>{taskFuncs};
-  pool.start();
-
-  while (true) {
-    uint32_t jobRemaining = pool.getJobRemaining();
-    notifyRemaining(jobRemaining, (uint32_t)tasks.size());
-    if (jobRemaining == 0) {
-      break;
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(40));
-  }
-
-  pool.waitAndExit();
-  auto results = pool.getResults();
-
-  MkvCombineSummary summary;
-  for (const auto& result : results) {
+    const auto result = runMkvMergeTool(opts);
     if (result.error) {
       ++summary.failed;
-      wxLogError("task failed: %s", *result.error);
+      wxLogError("Task %u/%u failed: %s",
+                 static_cast<unsigned>(i + 1), taskCount, *result.error);
     } else {
       ++summary.succeeded;
-      wxLogInfo("task status: <OK>");
+      wxLogInfo("Task %u/%u completed successfully",
+                static_cast<unsigned>(i + 1), taskCount);
     }
+
+    // taskRemaining counts tasks not yet started; completed count is therefore
+    // accurate even if a task failed (failures do not stop the queue).
+    notifyRemaining(taskCount - static_cast<uint32_t>(i + 1), taskCount);
   }
+
   return summary;
 }
