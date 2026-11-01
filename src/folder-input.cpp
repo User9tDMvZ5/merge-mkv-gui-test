@@ -32,7 +32,8 @@ std::vector<fs::path> FolderInput::getFilteredFileList() const {
   std::vector<fs::path> paths;
 
   for (const auto& path : allFiles_) {
-    if (extension_.empty() || path.extension() == extension_) {
+    if (extension_.empty() || path.extension() == extension_ ||
+        (extension_ == ".mka" && path.extension() == ".ac3")) {
       paths.push_back(path);
     }
   }
@@ -113,7 +114,8 @@ void FolderInput::updateControl() {
   stringArr.Alloc(allFiles_.size());
 
   for (const auto& path : allFiles_) {
-    if (extension_.empty() || path.extension() == extension_) {
+    if (extension_.empty() || path.extension() == extension_ ||
+        (extension_ == ".mka" && path.extension() == ".ac3")) {
       stringArr.Add(toWxString(path.filename()));
     }
   }
