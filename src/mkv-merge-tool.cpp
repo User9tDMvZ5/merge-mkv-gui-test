@@ -22,7 +22,10 @@ namespace {
         joinedCmd = joinedCmd + " " + arg;
       }
     }
-    wxLogInfo("run mkv merge: %s", joinedCmd.c_str());
+    // The command line is UTF-8, but wxLog's narrow %s overload may use the
+    // active Windows code page. Decode it explicitly before writing the log.
+    const wxString loggedCommand = wxString::FromUTF8(joinedCmd);
+    wxLogInfo("run mkv merge: %s", loggedCommand);
 
     auto subprocess = subprocess_s{};
     if (int result = subprocess_create(cmd.data(), 0, &subprocess); result != 0) {
