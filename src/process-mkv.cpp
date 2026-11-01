@@ -114,9 +114,6 @@ std::optional<MkvCombineTasks> makeMkvCombineTasks(ProcessMkvInput input) {
   auto mkvDiffs = diffPath(input.mkvs);
   mErrorIf(!mkvDiffs, "can't determine different parts in mkv files");
 
-  auto mkvNumbers = makeNumberedPaths(input.mkvs);
-  mErrorIf(!mkvNumbers, "MKV filenames must start with a number followed by ')', e.g. 1) video.mkv");
-
   auto subDiffs = std::optional<PathDiff>{};
   if (!input.subs.empty()) {
     subDiffs = diffPath(input.subs);
@@ -125,6 +122,8 @@ std::optional<MkvCombineTasks> makeMkvCombineTasks(ProcessMkvInput input) {
 
   auto audioNumbers = std::optional<NumberedPaths>{};
   if (!input.audios.empty()) {
+    auto mkvNumbers = makeNumberedPaths(input.mkvs);
+    mErrorIf(!mkvNumbers, "MKV filenames must start with a number followed by ')', e.g. 1) video.mkv");
     audioNumbers = makeNumberedPaths(input.audios);
     mErrorIf(!audioNumbers, "Audio filenames must start with a number followed by ')', e.g. 1) audio.ac3");
     for (const auto& [number, mkvPath] : *mkvNumbers) {
@@ -152,11 +151,7 @@ std::optional<MkvCombineTasks> makeMkvCombineTasks(ProcessMkvInput input) {
 
     if (audioNumbers) {
       auto number = numberedPrefix(mkvPath);
-      if (number) {
-        if (auto it = audioNumbers->find(*number); it != audioNumbers->end()) {
-          task.audioFile = it->second;
-        }
-      }
+      if (number) task.audioFile = audioNumbers->at(*number);
     }
     tasks.emplace_back(std::move(task));
   }
